@@ -1,0 +1,54 @@
+# Check del PR pareado (contrato tetra-memoria/2, sección 2.21).
+#
+# Lo exige el ruleset «PR pareado» de la organización en los repos de código: no se
+# copia a ningún repo. Corre con el token de la App tetra-memoria, de solo lectura, y no
+# escribe nada. GitHub solo lo corre al abrir, empujar o reabrir el PR: después de
+# editar la descripción, tetra pr lo vuelve a correr; a mano, «Re-run» en el check.
+name: tetra-memoria
+
+on:
+  pull_request:
+
+permissions: {}
+
+jobs:
+  verificar:
+    name: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Los PR de bots (Dependabot) no reciben los secretos de Actions.
+      - name: PR de un bot
+        if: github.event.pull_request.user.type == 'Bot'
+        run: echo "Lo abrió un bot, el PR pareado no aplica."
+
+      - name: Token de la App tetra-memoria
+        if: github.event.pull_request.user.type != 'Bot'
+        id: token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.TETRA_MEMORIA_CLIENT_ID }}
+          private-key: ${{ secrets.TETRA_MEMORIA_LLAVE }}
+          owner: tetraimpacts
+          permission-contents: read
+          permission-pull-requests: read
+
+      - name: Código del check y manifiesto de la noosfera
+        if: github.event.pull_request.user.type != 'Bot'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          set -euo pipefail
+          crudo='Accept: application/vnd.github.raw'
+          gh api -H "$crudo" 'repos/tetraimpacts/.github/contents/tetra-memoria/verificar.mjs' > "$RUNNER_TEMP/verificar.mjs"
+          gh api -H "$crudo" 'repos/tetraimpacts/tetraimpacts-project-memory/contents/generado/tetra.yaml' > "$RUNNER_TEMP/tetra.yaml"
+          yq -o=json '.' "$RUNNER_TEMP/tetra.yaml" > "$RUNNER_TEMP/tetra.json"
+
+      - name: Verificar el PR pareado
+        if: github.event.pull_request.user.type != 'Bot'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          PR_NUMERO: ${{ github.event.pull_request.number }}
+          TETRA_MANIFIESTO: ${{ runner.temp }}/tetra.json
+          TETRA_AUTORIZADOS: ${{ vars.TETRA_MEMORIA_AUTORIZADOS }}
+        run: node "$RUNNER_TEMP/verificar.mjs"
