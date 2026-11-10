@@ -1,0 +1,8 @@
+{
+  "formatos": ["tetra-seguridad/1"],
+  "herramientas": {
+    "gitleaks": ["8.30.1"],
+    "osv-scanner": ["2.7.0"]
+  },
+  "bloquean": ["critica", "alta"]
+}
